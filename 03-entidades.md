@@ -19,6 +19,9 @@ erDiagram
     LEAD }o--o{ PRODUCT : "is interested in"
     LEAD ||--o{ INTERACTION : "has"
     LEAD ||--o{ FUNNEL_STATUS_HISTORY : "has"
+    LEAD ||--o{ CONVERSATION : "has"
+    CONVERSATION ||--o{ MESSAGE : "contains"
+    USER ||--o{ MESSAGE : "sends"
 ```
 
 ---
@@ -124,17 +127,47 @@ Pessoa ou empresa em prospecção, seja por contato direto (inbound) ou busca lo
 | `created_at` | Timestamp | Sim | Data/hora de criação do registro |
 | `updated_at` | Timestamp | Sim | Data/hora da última atualização |
 
+## Conversation
+
+Linha de comunicação por chat entre o vendedor e o lead, em um canal específico. Um lead pode ter mais de uma conversa (ex.: uma no WhatsApp e outra no Telegram).
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `id` | UUID | Sim | Identificador único |
+| `lead_id` | FK → Lead | Sim | Lead ao qual a conversa pertence |
+| `channel` | Enum: `META_WHATSAPP`, `META_INSTAGRAM`, `META_MESSENGER`, `TELEGRAM` | Sim | Canal de chat usado nesta conversa (não inclui `WEBSITE`, que não é um canal de conversa contínua) |
+| `external_thread_id` | String | Sim | Identificador da conversa no provedor externo (ex.: número de telefone no formato WhatsApp, `chat_id` do Telegram) — usado para rotear mensagens recebidas via webhook para a conversa correta |
+| `status` | Enum: `OPEN`, `CLOSED` | Sim | Permite arquivar conversas encerradas sem apagar o histórico |
+| `created_at` | Timestamp | Sim | Data/hora de criação |
+| `updated_at` | Timestamp | Sim | Data/hora da última mensagem (usado para ordenar a inbox por mais recente) |
+
+## Message
+
+Cada mensagem trocada dentro de uma Conversation — enviada pelo vendedor através do sistema ou recebida do lead via webhook do canal.
+
+| Campo | Tipo | Obrigatório | Descrição |
+|---|---|---|---|
+| `id` | UUID | Sim | Identificador único |
+| `conversation_id` | FK → Conversation | Sim | Conversa à qual a mensagem pertence |
+| `direction` | Enum: `INBOUND`, `OUTBOUND` | Sim | `INBOUND` = enviada pelo lead; `OUTBOUND` = enviada pelo vendedor |
+| `sender_user_id` | FK → User (nullable) | Apenas se `OUTBOUND` | Vendedor que enviou a mensagem; nulo em mensagens `INBOUND`, que vêm do lead |
+| `content` | Texto | Sim | Conteúdo textual da mensagem |
+| `media_url` | String (nullable) | Não | URL de mídia anexada (imagem, áudio, documento), quando houver |
+| `external_message_id` | String (nullable) | Não | Identificador da mensagem no provedor externo, usado para correlacionar atualizações de status |
+| `status` | Enum: `PENDING`, `SENT`, `DELIVERED`, `READ`, `FAILED` | Sim | Status de entrega, relevante principalmente para mensagens `OUTBOUND` |
+| `sent_at` | Timestamp | Sim | Data/hora de envio (vendedor) ou de recebimento (lead) |
+
 ## Interaction
 
-Histórico de contatos com o lead ao longo do tempo (mensagens, ligações, observações).
+Histórico de contatos com o lead que **não** são mensagens de chat — ligações e observações do vendedor. Mensagens de chat ficam em `Conversation`/`Message`.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
 | `id` | UUID | Sim | Identificador único |
 | `lead_id` | FK → Lead | Sim | Lead ao qual a interação pertence |
 | `user_id` | FK → User | Sim | Autor do registro (quem interagiu) |
-| `type` | Enum: `MESSAGE`, `CALL`, `NOTE` | Sim | Natureza da interação |
-| `content` | Texto | Sim | Conteúdo da mensagem, resumo da ligação ou observação |
+| `type` | Enum: `CALL`, `NOTE` | Sim | Natureza da interação |
+| `content` | Texto | Sim | Resumo da ligação ou observação |
 | `created_at` | Timestamp | Sim | Data/hora da interação |
 
 ## FunnelStatusHistory
@@ -159,3 +192,5 @@ Rastreia as transições de etapa de um lead ao longo do funil, permitindo calcu
 - Os campos marcados como `nullable`/"Não" (obrigatório) variam conforme o `lead_type`/`origin_type` — a validação de obrigatoriedade condicional deve ser garantida na camada de aplicação (ver `02-bibliotecas-e-apis.md`, Spring Validation / Zod), não apenas no banco.
 - `Lead.lead_type` e `Lead.funnel_status` como enums simples (em vez de tabelas à parte) refletem que são conjuntos de valores fixos e pequenos, conforme definidos no estudo de caso; podem evoluir para tabelas próprias se o negócio passar a precisar de etapas/tipos configuráveis.
 - `LeadOrigin.capture_method` existe para diferenciar, na prática, os três jeitos de um lead entrar no sistema hoje: cadastro manual pelo vendedor (Meta/Telegram/grupos), chamada de API feita pelo site (fora do escopo deste projeto) e busca automatizada do serviço de prospecção (Google Maps/CNPJ-Receita Federal).
+- **`Conversation`/`Message` vs. `Interaction`**: a criação do `Lead` continua manual para Meta/Telegram, mas a partir daí toda mensagem trocada com o cliente é registrada automaticamente pelo serviço de mensageria em `Message`, dentro de uma `Conversation` — não é digitada manualmente pelo vendedor. `Interaction` fica reservada para contatos que não passam pelo chat do sistema (ligações telefônicas, observações internas).
+- Uma `Conversation` não existe para o canal `WEBSITE`: o formulário do site gera um `Lead`, mas a conversa subsequente com esse lead acontece por WhatsApp ou Telegram, como qualquer outra.

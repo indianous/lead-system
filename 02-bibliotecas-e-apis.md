@@ -19,7 +19,7 @@
 
 | Biblioteca | Uso | Motivo |
 |---|---|---|
-| **Spring Data JPA (Hibernate)** | Acesso a dados / ORM para Lead, Produto, Usuário, Permissão, Interação, Status do Funil | Reduz boilerplate de acesso a dados mantendo controle sobre as consultas |
+| **Spring Data JPA (Hibernate)** | Acesso a dados / ORM para Lead, Produto, Usuário, Permissão, Conversa, Mensagem, Interação, Status do Funil | Reduz boilerplate de acesso a dados mantendo controle sobre as consultas |
 | **PostgreSQL JDBC Driver** | Conexão com o banco PostgreSQL | Banco definido no estudo de caso |
 | **Flyway** | Versionamento e migração de schema do banco | Rastreabilidade de mudanças de schema, essencial junto com TDD (migrações previsíveis por ambiente de teste) |
 
@@ -30,7 +30,8 @@
 | **Spring Security** | Autenticação e controle de acesso (RBAC) | Base para o modelo de papéis/permissões — sem tela de autocadastro, com criação de usuário restrita |
 | **JJWT (Java JWT)** ou **Spring Authorization Server** | Emissão/validação de tokens de sessão da API interna | Autenticação stateless para o frontend Next.js consumir a API |
 | **API Key / token de integração (implementação própria sobre Spring Security)** | Proteção do endpoint público que recebe leads do site | O site é externo ao projeto e não passa pelo login de usuário — precisa de um mecanismo de autenticação próprio (chave de API) |
-| **Bucket4j** | Rate limiting do endpoint público de recepção de leads | Mitiga abuso/spam nesse endpoint, que é público por natureza |
+| **Verificação de assinatura de webhook (implementação própria com `javax.crypto`/HMAC-SHA256)** | Validação da autenticidade das chamadas recebidas nos webhooks de mensagens (Meta/Telegram) | Cada provedor assina o payload do webhook; validar a assinatura evita processar mensagens forjadas |
+| **Bucket4j** | Rate limiting dos endpoints públicos (recepção de leads do site e webhooks de mensagens) | Mitiga abuso/spam nesses endpoints, que são públicos por natureza |
 
 ### Testes (TDD)
 
@@ -40,6 +41,23 @@
 | **Mockito** | Mocks/stubs em testes unitários (ex.: simular API do Google Maps, WhatsApp, Telegram) | Isola a lógica de negócio das integrações externas nos testes unitários |
 | **Testcontainers** | Sobe um PostgreSQL real em container para testes de integração | Testes de persistência mais próximos do ambiente real, sem depender de banco em memória divergente do Postgres |
 | **Spring Boot Test / MockMvc** | Testes de integração da camada web (controllers/API) | Testa o contrato da API (incluindo o endpoint público do site) de ponta a ponta |
+
+### Integrações externas — mensageria com o lead (chat)
+
+> Usa as mesmas plataformas (Meta/Telegram) das notificações internas abaixo, mas para um propósito diferente: aqui é a **conversa comercial com o lead**, não o aviso ao usuário do sistema.
+
+| API | Uso | Motivo |
+|---|---|---|
+| **WhatsApp Business Platform (Cloud API, Meta)** — endpoint `messages` | Envio de mensagens do vendedor para o lead | Canal de chat definido no estudo de caso para leads de Meta/busca local |
+| **WhatsApp Business Platform — Webhooks** | Recebimento das respostas do lead e status de entrega/leitura das mensagens enviadas | Necessário para trazer a resposta do cliente de volta para dentro do sistema |
+| **Telegram Bot API** — método `sendMessage` | Envio de mensagens do vendedor para o lead | Canal de chat definido no estudo de caso |
+| **Telegram Bot API — `setWebhook` / atualizações recebidas** | Recebimento das mensagens que o lead envia ao bot | Necessário para trazer a resposta do cliente de volta para dentro do sistema |
+
+### Comunicação em tempo real
+
+| Biblioteca | Uso | Motivo |
+|---|---|---|
+| **Spring WebSocket (STOMP sobre SockJS)** | Envia ao frontend, em tempo real, as mensagens recebidas via webhook e atualizações de status de entrega | Evita que o vendedor precise atualizar a página para ver a resposta do lead na conversa |
 
 ### Integrações externas — notificações
 
@@ -90,6 +108,7 @@
 |---|---|---|
 | **dnd-kit** | Drag-and-drop dos cards de lead no dashboard estilo Kanban | Move leads entre etapas do funil (Novo → Contatado → Proposta → Negociação → Fechado/Perdido) |
 | **date-fns** | Formatação e cálculo de datas (tempo de primeira resposta, tempo até fechamento) | Usado nas métricas de sucesso do funil |
+| **@stomp/stompjs** | Cliente WebSocket (STOMP) para a tela de conversa/chat do lead | Recebe mensagens novas e atualizações de status em tempo real do backend, sem polling |
 
 ### Testes (TDD)
 
@@ -105,4 +124,5 @@
 
 - O **site institucional com o formulário de contato do lead está fora do escopo deste projeto** (ver estudo de caso) — por isso ele não aparece nas listas acima: o único ponto de contato entre ele e este sistema é o endpoint público de API descrito na seção de backend.
 - APIs de canais futuros (outras redes sociais além de Meta/Telegram) serão adicionadas a este documento conforme forem priorizadas.
+- A **central de mensagens** cobre apenas os canais Meta e Telegram — o formulário do site não é um canal de conversa contínua, apenas de captação pontual (ver `04-rotas-e-telas.md`).
 - Provedores de e-mail transacional e de dados de CNPJ estão listados como opções a confirmar — a escolha final depende de custo, limites de uso e volume esperado, e deve ser validada antes do início da implementação da integração correspondente.
