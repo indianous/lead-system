@@ -30,6 +30,7 @@ Este diretório é apenas um agrupador de documentação; **`backend/` e `fronte
   1. Problemas encontrados (arquivo, linha, diagnóstico)
   2. Testes a incluir/alterar (agrupados por arquivo)
   3. O que entra no projeto (tipos → backend → BFF → componentes → páginas)
+- Antes de fazer qualquer alteração de código, salvar esse plano como arquivo em `plans/` na raiz do projeto afetado (`frontend/plans/` ou `backend/plans/`) — só começar a implementar depois de o plano estar salvo.
 
 ### UI — `base-ds` é obrigatório
 
