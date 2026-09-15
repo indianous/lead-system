@@ -31,6 +31,7 @@ Este diretório é apenas um agrupador de documentação; **`backend/` e `fronte
   2. Testes a incluir/alterar (agrupados por arquivo)
   3. O que entra no projeto (tipos → backend → BFF → componentes → páginas)
 - Antes de fazer qualquer alteração de código, salvar esse plano como arquivo em `plans/` na raiz do projeto afetado (`frontend/plans/` ou `backend/plans/`) — só começar a implementar depois de o plano estar salvo.
+- Depois de salvar o plano, aguardar a confirmação do usuário antes de mexer no código — nunca começar a implementar só porque o plano foi salvo.
 
 ### UI — `base-ds` é obrigatório
 
@@ -38,6 +39,10 @@ Sempre usar `Button`, `Card`, `Dialog`, `FormField`, `FileUpload`, `Drawer`, `Si
 Só usar elemento HTML nativo quando genuinamente não houver equivalente no base-ds — avisar antes.
 
 Se a aplicação precisar de uma alteração em um componente existente do `base-ds` ou de um componente novo, abrir uma issue no repositório `indianous/base-ds` (GitHub) descrevendo a necessidade — antes de implementar workaround local.
+
+## Verificação visual
+
+Todas as verificações visuais (telas, fluxos no navegador, screenshots) são feitas pelo próprio usuário. Não rodar a aplicação no Chrome nem usar automação de navegador para conferir o resultado — não invocar a skill `claude-in-chrome` nem ferramentas `mcp__claude-in-chrome__*` neste projeto.
 
 ## Convenções importantes do domínio
 
